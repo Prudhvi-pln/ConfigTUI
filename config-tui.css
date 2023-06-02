@@ -1,0 +1,68 @@
+/* css for Save screen */
+
+SaveScreen {
+    align: center middle;
+}
+
+#save-dialog {
+    grid-size: 2;
+    grid-gutter: 1 2;
+    grid-rows: 1fr 3;
+    padding: 0 1;
+    width: 60;
+    height: 11;
+    border: round $background 80%;
+    background: $surface;
+}
+
+#save-input {
+    border: round blue;
+    column-span: 2;
+    height: 1fr;
+    width: 1fr;
+    content-align: center middle;
+}
+
+#save, #cancel {
+    border: round;
+    margin-left: 5;
+    background: $surface;
+}
+
+#cancel {
+    border: round red;
+}
+
+#save:hover, #cancel:hover {
+    border: heavy $boost;
+}
+
+/* css for Main screen */
+
+#header {
+    dock: top;
+    content-align: center middle;
+    border: double blue;
+    background: blue 20%;
+    width: 100%;
+}
+
+#edit-node {
+    border: round orange;
+    border-subtitle-color: red;
+    border-subtitle-style: italic;
+}
+
+#edit-node:disabled {
+    border: round gray;
+}
+
+#edit-node:focus {
+    border: round;
+}
+
+Tooltip {
+    padding: 1 1;
+    background: $primary 80%;
+    color: auto 90%;
+}
