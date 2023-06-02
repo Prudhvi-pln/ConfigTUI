@@ -1,7 +1,7 @@
 # Configuration Editor TUI (__ConfigTUI__)
-```
-Enhancing the experience of editing YAML files, especially when dealing with large files or when using Linux editors, can be a challenging task. To address this, we present "config-tui", a minimalist and intuitive Text User Interface (TUI) tool designed specifically for effortless viewing and editing of YAML files. With its clean and user-friendly interface, config-tui simplifies the process, making YAML file manipulation a breeze.
 
+Enhancing the experience of editing YAML files, especially when dealing with large files or when using Linux editors, can be a challenging task. To address this, we present "config-tui", a minimalist and intuitive Text User Interface (TUI) tool designed specifically for effortless viewing and editing of YAML files. With its clean and user-friendly interface, config-tui simplifies the process, making YAML file manipulation a breeze.
+```
 config-tui: where YAML editing gets a friendly and quirky makeover! We make YAML editing an absolute delight :)
 ```
  - version: `2023.06.01_1.0`
