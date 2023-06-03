@@ -1,7 +1,7 @@
 # Description: To view/edit yaml files in TUI
 # Requires config-tui.css in the same folder level
 __author__ = 'PrudhviCh'
-__version__ = '2023.06.01_1.0'
+__version__ = '1.0'
 
 import os
 import sys
@@ -20,7 +20,35 @@ from textual.widgets.tree import TreeNode
 
 CSS_FILE = 'config-tui.css'
 edit_dict_keys = False
-allow_value_data_type_changes = False
+allow_value_data_type_changes = True
+
+
+class AlertScreen(ModalScreen[bool]):
+    """Screen for a Dialog Box.
+
+    Returns:
+        boolean status of user's confirmation
+    """
+
+    CSS_PATH = CSS_FILE
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__()
+        self.message = kwargs['message']
+
+    def compose(self) -> ComposeResult:
+        yield Grid(
+            Label(f"{self.message}", id="dialog-msg"),
+            Button("Yes", variant="success", id="yes"),
+            Button("No", variant="primary", id="no"),
+            id="dialog-box",
+        )
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == 'yes':
+            self.dismiss(True)
+        else:
+            self.dismiss(False)
 
 
 class SaveScreen(ModalScreen):
@@ -38,9 +66,9 @@ class SaveScreen(ModalScreen):
         self.out_file_name.border_title = 'Save as'
         yield Grid(
             self.out_file_name,
-            Button("Save", variant="success", id="save"),
-            Button("Cancel", variant="primary", id="cancel"),
-            id="save-dialog",
+            Button("Save", variant="success", id="yes"),
+            Button("Cancel", variant="primary", id="no"),
+            id="dialog-box",
         )
 
     def save_file(self) -> None:
@@ -51,7 +79,7 @@ class SaveScreen(ModalScreen):
         self.app.exit()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        if event.button.id == 'cancel':
+        if event.button.id == 'no':
             self.app.pop_screen()
         else:
             self.save_file()
@@ -68,9 +96,9 @@ class ConfigurationEditor(App):
 
     BINDINGS = [
         ("o", "toggle_dark", "Toggle dark mode"),
+        ("x", "toggle", "Expand/Collapse All"),
         ("i", "insert_node", "Insert Node"),
         ("d", "delete_node", "Delete Node"),
-        ("x", "toggle", "Expand/Collapse All"),
         ("e", "edit", "Edit Value"),
         ("r", "reload", "Reload"),
         ("s", "save", "Save"),
@@ -103,14 +131,22 @@ class ConfigurationEditor(App):
             node (TreeNode): Parent node.
             data (object): Data associated with the node.
         """
+        if node.is_root:
+            abs_key = ''
+        elif node.parent.data.get('abs_key') == '':
+            abs_key = f"{name}"
+        else:
+            abs_key = f"{node.parent.data.get('abs_key')}.{name}"
+        val_type = str(type(data)).split("'")[1]
         node.data = {
             'key': name,
-            'value': name
+            'value': name,
+            'type': val_type,
+            'abs_key': abs_key
         }
         if isinstance(data, dict):
             node.set_label(Text(f"{{}} {name}"))
             node.data.update({
-                'type': 'dict',
                 'editable': edit_dict_keys
             })
             for key, value in data.items():
@@ -119,7 +155,6 @@ class ConfigurationEditor(App):
         elif isinstance(data, list):
             node.set_label(Text(f"[] {name}"))
             node.data.update({
-                'type': 'list',
                 'editable': False
             })
             for index, value in enumerate(data):
@@ -127,14 +162,6 @@ class ConfigurationEditor(App):
                 self.update_tree(str(index), new_node, value)
         else:
             node.allow_expand = False
-            if isinstance(data, bool):
-                val_type = 'bool'
-            elif isinstance(data, float):
-                val_type = 'float'
-            elif isinstance(data, int):
-                val_type = 'int'
-            else:
-                val_type = 'str'
             # add both key and value to label for displaying
             if name:
                 label = Text.assemble(
@@ -146,7 +173,6 @@ class ConfigurationEditor(App):
             # add data separately to node
             node.data.update({
                 'value': data,
-                'type': val_type,
                 'editable': True
             })
 
@@ -156,7 +182,7 @@ class ConfigurationEditor(App):
             try:
                 self.json_data = yaml.safe_load(yml)
             except yaml.YAMLError as exc:
-                print(exc)
+                print(f'Failed to load YAML with: {exc}')
                 exit(1)
 
     def on_mount(self) -> None:
@@ -164,10 +190,11 @@ class ConfigurationEditor(App):
         # load file
         self.load_file()
         # load into tree
-        self.cur_node = self.json_tree.root
         self.update_tree('ROOT', self.json_tree.root, self.json_data)
-        self.json_tree.root.expand()
+        # self.json_tree.show_root = False
+        # self.cur_node = self.json_tree.get_node_at_line(0)
         self.edit_box.disabled = True
+        self.cur_node = self.json_tree.root.expand()
 
     def action_toggle_dark(self) -> None:
         """An action to toggle dark mode."""
@@ -189,7 +216,6 @@ class ConfigurationEditor(App):
         self.load_file()
         # re-create tree
         self.update_tree('ROOT', tree.root, self.json_data)
-        tree.root.collapse()
 
     def action_edit(self) -> None:
         # do not edit if it is root or node is not editable
@@ -199,8 +225,17 @@ class ConfigurationEditor(App):
         # change focus to input box for editing
         self.edit_box.focus()
 
+    def invalid_input_handler(self, err_msg) -> None:
+        """Handle error inputs in edit field."""
+        self.edit_box.border_subtitle = f'{err_msg}'
+        self.edit_box.styles.animate(attribute='background', value='red', duration=1.0, final_value=None)
+
     def update_value(self) -> bool:
-        """Update the value in a node."""
+        """Update the value in a node.
+
+        Returns:
+            boolean status whether update is successful
+        """
 
         old_label = self.cur_node.label
         new_value = self.edit_box.value
@@ -225,8 +260,8 @@ class ConfigurationEditor(App):
                 if allow_value_data_type_changes:
                     pass
                 else:
-                    self.edit_box.border_subtitle = f'INVALID VALUE. Error: {e}'
-                    return False # do not make any changes if conversion failed
+                    self.invalid_input_handler(f'INVALID VALUE. Error: {e}')
+                    return False    # do not make any changes if conversion failed
 
             new_label = Text.assemble(
                 Text.from_markup(f"[b]{self.cur_node.label.split(':')[0]}[/b]{self.delimiter}"), ReprHighlighter()(repr(new_value))
@@ -283,12 +318,16 @@ class ConfigurationEditor(App):
         self.push_screen(SaveScreen(data=json_data, input_yml=self.config_file))
 
     def add_new_node(self) -> bool:
-        """Add a new node to the tree."""
+        """Add a new node to the tree.
+
+        Returns:
+            boolean status whether insertion is successful
+        """
         data = self.edit_box.value
         try:
             data = eval(data)
         except Exception as e:
-            self.edit_box.border_subtitle = f'INVALID FORMAT. Error: {e}'
+            self.invalid_input_handler(f'INVALID FORMAT. Error: {e}')
             return False
         # convert leaf node to expandable
         self.cur_node.allow_expand = True
@@ -339,9 +378,23 @@ class ConfigurationEditor(App):
 
     def action_delete_node(self) -> None:
         """Remove the selected node."""
-        self.cur_node.remove()
-        # reset cursor to root to update the cur_node
-        self.json_tree.action_scroll_home()
+        # do not delete root node
+        if self.cur_node.data.get('abs_key') == '':
+            return
+        
+        def get_return_status(status: bool) -> None:
+            """Called when AlertScreen is dismissed."""
+            if status:
+                # delete the node on confirmation
+                try:
+                    self.cur_node.remove()
+                except TreeNode.RemoveRootError as rre:
+                    pass
+                # reset cursor to root to update the cur_node
+                self.json_tree.action_scroll_home()
+
+        confirm_screen = AlertScreen(message=f"Delete node \[{self.cur_node.data['abs_key']}] ?")
+        self.push_screen(confirm_screen, get_return_status)
 
 
 if __name__ == "__main__":

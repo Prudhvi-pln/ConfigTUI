@@ -1,9 +1,10 @@
 config-1:
-    param: true
+    param: 'True'
     params:
-    - val1
     - val2
     -   in1: vl1
+    - new
+    - new1
     dict:
         k1: v1
         k2: 11
