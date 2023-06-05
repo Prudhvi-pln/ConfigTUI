@@ -3,8 +3,8 @@
 __author__ = 'PrudhviCh'
 __version__ = '1.0'
 
+import argparse
 import os
-import sys
 import yaml
 
 from rich.text import Text
@@ -19,8 +19,6 @@ from textual.widgets.tree import TreeNode
 
 
 CSS_FILE = 'config-tui.css'
-edit_dict_keys = False
-allow_value_data_type_changes = True
 
 
 class AlertScreen(ModalScreen[bool]):
@@ -398,12 +396,20 @@ class ConfigurationEditor(App):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print(f'Usage: python {sys.argv[0]} [yaml-file-to-be-edited]')
-        exit(1)
-    input_file = sys.argv[1]
+    parser = argparse.ArgumentParser(description='ConfigTUI to view/edit yaml files using a TUI')
+    parser.add_argument('-v', '--version', action='version', version=f'{os.path.basename(__file__)} v{__version__}')
+    parser.add_argument('-i', '--input', required=True, type=str, help='yaml configuration file to be loaded')
+    parser.add_argument('-edk', '--edit-dict-keys', action='store_true', default=False, help='enable editing keys with nested data [default: disabled]')
+    parser.add_argument('-sdt', '--enable-strict-data-types', action='store_false', default=True, help='enforce strict data type while editing [default: disabled]')
+
+    args = parser.parse_args()
+    input_file = args.input
+    edit_dict_keys = args.edit_dict_keys
+    allow_value_data_type_changes = args.enable_strict_data_types
+
     if not os.path.isfile(input_file):
         print(f'Config file [{input_file}] not found')
         exit(1)
+
     ce_tui = ConfigurationEditor(config_file=input_file)
     ce_tui.run()

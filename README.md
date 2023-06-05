@@ -4,7 +4,7 @@ Enhancing the experience of editing YAML files, especially when dealing with lar
 ```
 config-tui: where YAML editing gets a friendly and quirky makeover! We make YAML editing an absolute delight :)
 ```
- - version: `1.0` - [2023-06-03]
+ - version: `1.0` - [2023-06-05]
 
 ## Pre-requisites
 ```
@@ -19,8 +19,9 @@ pip >= 20.0.0
     ```
 ## Usage
 ```
-python config-tui.py [yaml-file-to-be-edited]
+python config-tui.py -i [yaml-file-to-be-edited]
 ```
+ - Run this command for more details: `python config-tui.py -h`
  - Tested on:
    - Windows
    - Linux
@@ -41,8 +42,8 @@ python config-tui.py [yaml-file-to-be-edited]
  - Prudhvi Ch
 
 ## Known issues & Fixes
- - By default, ConfigTUI has the ability to infer data types and do type conversions. It can be overridden by setting `allow_value_data_type_changes = False`
- - By default, ConfigTUI does not allow to edit key of a nested value. It can be overridden by setting `edit_dict_keys = True`
+ - By default, ConfigTUI has the ability to infer data types and do type conversions. It can be overridden by passing `--enable-strict-data-types` as a CLI option
+ - By default, ConfigTUI does not allow to edit key of a nested value. It can be overridden by passing `--edit-dict-keys` as a CLI option
  - For inferring any value as string explicitly, encapsule the value in quotes while modifying
 
 ## Behind-the-scenes of Development
