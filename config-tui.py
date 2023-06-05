@@ -73,7 +73,8 @@ class SaveScreen(ModalScreen):
         # save configuration & exit
         out_file = self.out_file_name.value
         with open(out_file, 'w') as out:
-            yaml.dump(self.new_json_data, out, allow_unicode=False, sort_keys=False, indent=4)
+            # default indentation is 2 & use infinite width to avoid breaking of lines
+            yaml.dump(self.new_json_data, out, allow_unicode=False, sort_keys=False, indent=2, width=float('inf'))
         self.app.exit()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -180,8 +181,7 @@ class ConfigurationEditor(App):
             try:
                 self.json_data = yaml.safe_load(yml)
             except yaml.YAMLError as exc:
-                print(f'Failed to load YAML with: {exc}')
-                exit(1)
+                raise Exception(f'Failed to load YAML with: {exc}')
 
     def on_mount(self) -> None:
         """Load the JSON when the app starts."""
