@@ -4,8 +4,7 @@ Enhancing the experience of editing YAML files, especially when dealing with lar
 ```
 config-tui: where YAML editing gets a friendly and quirky makeover! We make YAML editing an absolute delight :)
 ```
- - version: `1.1` - [2023-06-06]
- - This version which uses PyYAML to interact with yaml files
+ - version: `1.2` - [2023-06-07]
 
 ## Pre-requisites
 ```
@@ -31,9 +30,10 @@ python config-tui.py -i [yaml-file-to-be-edited]
 - [x] Edit and Save YAML file
 - [ ] Ability to search within tree
 - [x] Add / remove new items in the yaml
+- [x] Preserve comments in the yaml
 
 ## Limitations
- - Cannot preserve comments or any decorators on saving a yaml file
+ - ~~Cannot preserve comments or any decorators on saving a yaml file.~~ Fixed as of v1.2
 
 ## Examples
  - Viewing yaml files: ![view yaml tree](./images/tree-tui.png)
@@ -46,6 +46,9 @@ python config-tui.py -i [yaml-file-to-be-edited]
  - By default, ConfigTUI has the ability to infer data types and do type conversions. It can be overridden by passing `--enable-strict-data-types` as a CLI option
  - By default, ConfigTUI does not allow to edit key of a nested value. It can be overridden by passing `--edit-dict-keys` as a CLI option
  - For inferring any value as string explicitly, encapsule the value in quotes while modifying
+
+> **Warning**
+> As of v1.2, ConfigTUI can preserve comments but it is not 100% accurate.
 
 ## Behind-the-scenes of Development
 Below are some other tools which I explored and their reason of rejection:
