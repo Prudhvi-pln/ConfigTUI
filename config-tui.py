@@ -1,7 +1,7 @@
 # Description: To view/edit yaml files in TUI
 # Requires config-tui.css in the same folder level
 __author__ = 'PrudhviCh'
-__version__ = '1.0'
+__version__ = '1.1'
 
 import argparse
 import os
@@ -109,7 +109,14 @@ class ConfigurationEditor(App):
     def __init__(self, **kwargs) -> None:
         super().__init__()
         self.config_file = kwargs['config_file']
+        # delimiter to be dispayed in labels of tree
         self.delimiter = ': '
+        # label highlighers in tree
+        self.default_highlight = 'bold'
+        self.edit_highlight = 'bold italic yellow'
+        self.insert_highlight = 'bold italic green'
+        self.delete_highlight = 'bold italic red'
+        # placeholders for edit fields
         self.edit_node_help = "Select a node to edit..."
         self.add_node_help = "Provide input in json/dict format. [Ex: {'key1': 'val1', 'key2': [1, 2]}]"
 
@@ -122,7 +129,23 @@ class ConfigurationEditor(App):
         yield self.json_tree
         yield self.edit_box
 
-    def update_tree(self, name: str, node: TreeNode, data: object) -> None:
+    def __text_highlighter__(self, highlighter, key=None, value=None) -> Text:
+        """helper function to highlight label text."""
+        if key is not None and value is None:
+            # paint label of nested data
+            highlighted = Text.from_markup(f"[{highlighter}]{key}[/]")
+        elif key is None and value is not None:
+            # paint label with only value
+            highlighted = Text.assemble(ReprHighlighter()(repr(value)))
+        else:
+            # paint label with both key and value
+            highlighted = Text.assemble(
+                Text.from_markup(f"[{highlighter}]{key}[/]{self.delimiter}"), ReprHighlighter()(repr(value))
+            )
+
+        return highlighted
+
+    def update_tree(self, name: str, node: TreeNode, data: object, highlighter) -> None:
         """Adds a node to the tree.
 
         Args:
@@ -130,12 +153,13 @@ class ConfigurationEditor(App):
             node (TreeNode): Parent node.
             data (object): Data associated with the node.
         """
+        # add complete path of the key. populate it as a list of keys to preserve data type
         if node.is_root:
-            abs_key = ''
-        elif node.parent.data.get('abs_key') == '':
-            abs_key = f"{name}"
+            abs_key = []
         else:
-            abs_key = f"{node.parent.data.get('abs_key')}.{name}"
+            abs_key = node.parent.data.get('abs_key').copy()
+            abs_key.append(name)
+
         val_type = str(type(data)).split("'")[1]
         node.data = {
             'key': name,
@@ -144,30 +168,26 @@ class ConfigurationEditor(App):
             'abs_key': abs_key
         }
         if isinstance(data, dict):
-            node.set_label(Text(f"{{}} {name}"))
+            node.set_label(self.__text_highlighter__(highlighter, f'{{}} {name}'))
             node.data.update({
                 'editable': edit_dict_keys
             })
             for key, value in data.items():
                 new_node = node.add("")
-                self.update_tree(key, new_node, value)
+                self.update_tree(key, new_node, value, highlighter)
         elif isinstance(data, list):
-            node.set_label(Text(f"[] {name}"))
+            node.set_label(self.__text_highlighter__(highlighter, f'[] {name}'))
             node.data.update({
                 'editable': False
             })
             for index, value in enumerate(data):
                 new_node = node.add("")
-                self.update_tree(str(index), new_node, value)
+                # self.update_tree(None, new_node, value, highlighter)
+                self.update_tree(index, new_node, value, highlighter)
         else:
             node.allow_expand = False
             # add both key and value to label for displaying
-            if name:
-                label = Text.assemble(
-                    Text.from_markup(f"[b]{name}[/b]{self.delimiter}"), ReprHighlighter()(repr(data))
-                )
-            else:
-                label = Text(repr(data))
+            label = self.__text_highlighter__(highlighter, name, data)
             node.set_label(label)
             # add data separately to node
             node.data.update({
@@ -181,14 +201,14 @@ class ConfigurationEditor(App):
             try:
                 self.json_data = yaml.safe_load(yml)
             except yaml.YAMLError as exc:
-                raise Exception(f'Failed to load YAML with: {exc}')
+                self.app.exit(result=1, message=f'Error loading yaml file: {exc}')
 
     def on_mount(self) -> None:
         """Load the JSON when the app starts."""
         # load file
         self.load_file()
         # load into tree
-        self.update_tree('ROOT', self.json_tree.root, self.json_data)
+        self.update_tree('ROOT', self.json_tree.root, self.json_data, self.default_highlight)
         # self.json_tree.show_root = False
         # self.cur_node = self.json_tree.get_node_at_line(0)
         self.edit_box.disabled = True
@@ -213,7 +233,7 @@ class ConfigurationEditor(App):
         # re-load file
         self.load_file()
         # re-create tree
-        self.update_tree('ROOT', tree.root, self.json_data)
+        self.update_tree('ROOT', tree.root, self.json_data, self.default_highlight)
 
     def action_edit(self) -> None:
         # do not edit if it is root or node is not editable
@@ -235,42 +255,52 @@ class ConfigurationEditor(App):
             boolean status whether update is successful
         """
 
-        old_label = self.cur_node.label
+        old_value = self.cur_node.data.get('value')
         new_value = self.edit_box.value
 
-        if self.cur_node.data.get('type') == 'dict':
-            new_label = Text(f"{{}} {new_value}")
-        elif self.cur_node.data.get('type') == 'list':
-            new_label = Text(f"[] {new_value}")
+        if allow_value_data_type_changes:
+            # infer value type
+            exprsn = f'{new_value}'
+        elif self.cur_node.data.get('type') == 'str':
+            # keep it in quotes to evalute as string
+            exprsn = f'"{new_value}"'
+        elif self.cur_node.data.get('type') in ['dict', 'list']:
+            # cast value to it's originial type based on key's type
+            typ = str(type(self.cur_node.data.get('key'))).split("'")[1]
+            exprsn = f"{typ}({new_value})"
         else:
+            # cast value to it's originial type
+            exprsn = f"{self.cur_node.data.get('type')}({new_value})"
+        try:
+            new_value = eval(exprsn)
+        except Exception as e:
             if allow_value_data_type_changes:
-                # infer value type
-                exprsn = f'{new_value}'
-            elif self.cur_node.data.get('type') == 'str':
-                # keep it in quotes to evalute as string
-                exprsn = f'"{new_value}"'
+                pass
             else:
-                # cast value to it's originial type
-                exprsn = f"{self.cur_node.data.get('type')}({new_value})"
-            try:
-                new_value = eval(exprsn)
-            except Exception as e:
-                if allow_value_data_type_changes:
-                    pass
-                else:
-                    self.invalid_input_handler(f'INVALID VALUE. Error: {e}')
-                    return False    # do not make any changes if conversion failed
+                self.invalid_input_handler(f'INVALID VALUE. Error: {e}')
+                return False    # do not make any changes if conversion failed
 
-            new_label = Text.assemble(
-                Text.from_markup(f"[b]{self.cur_node.label.split(':')[0]}[/b]{self.delimiter}"), ReprHighlighter()(repr(new_value))
-            )
+        # skip if there is no change
+        if old_value == new_value:
+            return True
 
-        if old_label != new_label:
-            # update key for expandable data
-            if self.cur_node.data.get('type') in ['dict', 'list']:
-                self.cur_node.data['key'] = new_value
-            self.cur_node.data['value'] = new_value
-            self.cur_node.set_label(new_label)
+        if self.cur_node.data.get('type') == 'dict':
+            new_label = self.__text_highlighter__(self.edit_highlight, f"{{}} {new_value}")
+        elif self.cur_node.data.get('type') == 'list':
+            new_label = self.__text_highlighter__(self.edit_highlight, f"[] {new_value}")
+        else:
+            new_label = self.__text_highlighter__(self.edit_highlight, self.cur_node.data['key'], new_value)
+            # highligh parent node if edited value is in a list
+            if self.cur_node.parent.data.get('type') == 'list':
+                self.cur_node.parent.set_label(self.__text_highlighter__(self.edit_highlight, f"{self.cur_node.parent.label}"))
+
+        # update key for expandable/nested data
+        if self.cur_node.data.get('type') in ['dict', 'list']:
+            self.cur_node.data['key'] = new_value
+            # update absolute key by replacing last occurrence with new value
+            self.cur_node.data['abs_key'][-1] = new_value
+        self.cur_node.data['value'] = new_value
+        self.cur_node.set_label(new_label)
 
         return True
 
@@ -329,7 +359,7 @@ class ConfigurationEditor(App):
             return False
         # convert leaf node to expandable
         self.cur_node.allow_expand = True
-        self.update_tree(self.cur_node.data['key'], self.cur_node, data)
+        self.update_tree(self.cur_node.data['key'], self.cur_node, data, self.insert_highlight)
 
         return True
 
@@ -377,7 +407,7 @@ class ConfigurationEditor(App):
     def action_delete_node(self) -> None:
         """Remove the selected node."""
         # do not delete root node
-        if self.cur_node.data.get('abs_key') == '':
+        if not self.cur_node.data.get('abs_key'):
             return
         
         def get_return_status(status: bool) -> None:
@@ -388,10 +418,14 @@ class ConfigurationEditor(App):
                     self.cur_node.remove()
                 except TreeNode.RemoveRootError as rre:
                     pass
+
+                # highlight parent node to indicate change
+                self.cur_node.parent.set_label(self.__text_highlighter__(self.delete_highlight, self.cur_node.parent.label))
+
                 # reset cursor to root to update the cur_node
                 self.json_tree.action_scroll_home()
 
-        confirm_screen = AlertScreen(message=f"Delete node \[{self.cur_node.data['abs_key']}] ?")
+        confirm_screen = AlertScreen(message=f"Delete node \[{' > '.join(str(k) for k in self.cur_node.data['abs_key'])}] ?")
         self.push_screen(confirm_screen, get_return_status)
 
 

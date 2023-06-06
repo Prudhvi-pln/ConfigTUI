@@ -4,7 +4,7 @@ Enhancing the experience of editing YAML files, especially when dealing with lar
 ```
 config-tui: where YAML editing gets a friendly and quirky makeover! We make YAML editing an absolute delight :)
 ```
- - version: `1.0` - [2023-06-05]
+ - version: `1.1` - [2023-06-06]
 
 ## Pre-requisites
 ```
