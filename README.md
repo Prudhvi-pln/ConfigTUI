@@ -5,6 +5,7 @@ Enhancing the experience of editing YAML files, especially when dealing with lar
 config-tui: where YAML editing gets a friendly and quirky makeover! We make YAML editing an absolute delight :)
 ```
  - version: `1.1` - [2023-06-06]
+ - This version which uses PyYAML to interact with yaml files
 
 ## Pre-requisites
 ```
