@@ -386,15 +386,6 @@ class ConfigurationEditor(App):
         # change focus to input box for editing
         self.edit_box.focus()
 
-    def action_save(self) -> None:
-        """Save the configuration changes."""
-
-        # As of v1.2, all changes are done in-memory rather than doing lazy loading
-        # json_data = export_tree_to_json(self.json_tree.root)
-
-        # send user to Save As popup
-        self.push_screen(SaveScreen(input_yml=self.config_file, data=self.json_data, yml_obj=self.yaml))
-
     @on(Tree.NodeHighlighted)
     def toggle_edit_field(self, event: Tree.NodeHighlighted) -> None:
         event.stop()
@@ -420,8 +411,8 @@ class ConfigurationEditor(App):
         elif self.edit_box.placeholder == self.add_node_help:
             status = self.add_new_node()
 
-        # remove any previous error message
         if status:
+            # remove any previous error message
             self.edit_box.border_subtitle = ''
             # once input submitted change focus to tree for viewing
             self.json_tree.focus()
@@ -466,6 +457,15 @@ class ConfigurationEditor(App):
 
         confirm_screen = AlertScreen(message=f"Delete node \[{' > '.join(str(k) for k in self.cur_node.data['abs_key'])}] ?")
         self.push_screen(confirm_screen, get_return_status)
+
+    def action_save(self) -> None:
+        """Save the configuration changes."""
+
+        # As of v1.2, all changes are done in-memory rather than doing lazy loading
+        # json_data = export_tree_to_json(self.json_tree.root)
+
+        # send user to Save As popup
+        self.push_screen(SaveScreen(input_yml=self.config_file, data=self.json_data, yml_obj=self.yaml))
 
 
 if __name__ == "__main__":
