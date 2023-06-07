@@ -2,10 +2,10 @@
 config-1:   # config-1 comment
   param: 'True'     # param comment
   params:
-  - val2
-  -  in1: vl1
+  - in1: vl11
   - new
-  - new1
+  - val2
+  - 123
   dict:
     k1: v1        # k1 same name comment
     k2: 11
@@ -14,7 +14,7 @@ config-1:   # config-1 comment
       v2:
       - v0
       - v1        # list element comment
-  k1: False     # k1 same name comment
+  k1: false     # k1 same name comment
 # breaking comment
 k1:
   k11: v1

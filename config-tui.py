@@ -160,17 +160,25 @@ class ConfigurationEditor(App):
 
         return highlighted
 
+    def _traverse_yaml_data_(self, keys: list) -> object:
+        """helper function to traverse the yaml data for a given list of keys
+
+        Returns the corresponding object
+        """
+        current_dict = self.json_data
+        for key in keys:
+            current_dict = current_dict[key]
+
+        return current_dict
+
     def _update_yaml_(self, new_value, action) -> bool:
         """helper function to update the in-memory yaml
 
         Returns: True if update is successful, else False
         """
-        current_dict = self.json_data
-        keys = self.cur_node.data['abs_key']
-        for key in keys[:-1]:
-            current_dict = current_dict[key]
+        current_dict = self._traverse_yaml_data_(self.cur_node.data['abs_key'][:-1])
 
-        last_key = keys[-1]
+        last_key = self.cur_node.data['abs_key'][-1]
 
         if action == 'edit':
             if self.cur_node.data['type'] == 'dict':        # handle nested key changes
@@ -179,10 +187,12 @@ class ConfigurationEditor(App):
             else:                                           # handle normal leaf-level key changes
                 current_dict[last_key] = new_value
         elif action == 'insert':                            # handle addition of new elements
-            if isinstance(new_value, dict):
+            if isinstance(current_dict[last_key], dict):
                 current_dict[last_key].update(new_value)
-            elif isinstance(new_value, list):
-                current_dict[last_key].extend(new_value)
+            elif isinstance(current_dict[last_key], list):
+                current_dict[last_key].append(new_value)
+            else:
+                current_dict[last_key] = new_value
         elif action == 'delete':                            # handle deletion of an existing element
             current_dict.pop(last_key)
 
@@ -235,10 +245,11 @@ class ConfigurationEditor(App):
             node.data.update({
                 'editable': False
             })
+            start_idx = len(node.children)  # start from an index depending on number of existing elements
             for index, value in enumerate(data):
                 new_node = node.add("")
                 # self.update_tree(None, new_node, value, highlighter)
-                self.update_tree(index, new_node, value, highlighter)
+                self.update_tree(index + start_idx, new_node, value, highlighter)
         else:
             node.allow_expand = False
             # add both key and value to label for displaying
@@ -281,8 +292,12 @@ class ConfigurationEditor(App):
         else:
             # cast value to it's originial type
             exprsn = f"{self.cur_node.data.get('type')}({new_value})"
+
         try:
             new_value = eval(exprsn)
+            if isinstance(new_value, (dict, list)):
+                status = self.add_new_node()             # call add node function if new data type is nested
+                return status
         except Exception as e:
             if allow_value_data_type_changes:
                 pass
@@ -325,13 +340,19 @@ class ConfigurationEditor(App):
         data = self.edit_box.value
         try:
             data = eval(data)
+            if self.cur_node.data['type'] == 'dict' and not isinstance(data, dict):
+                raise Exception('Value must be a dictionary for a node of dict type')
         except Exception as e:
             self._invalid_input_handler_(f'INVALID FORMAT. Error: {e}')
             return False
+
+        status = self._update_yaml_(data, action='insert')
+
         # convert leaf node to expandable
         self.cur_node.allow_expand = True
+        if self.cur_node.data['type'] == 'list':
+            data = [data]       # wrap data into list to render tree
         self.update_tree(self.cur_node.data['key'], self.cur_node, data, self.insert_highlight)
-        status = self._update_yaml_(data, action='insert')
 
         return status
 
@@ -346,13 +367,14 @@ class ConfigurationEditor(App):
         else:
             self.json_tree.root.expand_all()
 
-    def action_reload(self) -> None:
+    def action_reload(self, reload_from_disk=True) -> None:
         """Reload the configuration file."""
         # clear tree first
         tree = self.json_tree
         tree.clear()
-        # re-load file
-        self.load_file()
+        if reload_from_disk:
+            # re-load file from disk
+            self.load_file()
         # re-create tree
         self.update_tree('ROOT', tree.root, self.json_data, self.default_highlight)
 
@@ -430,8 +452,14 @@ class ConfigurationEditor(App):
                 except TreeNode.RemoveRootError as rre:
                     pass
 
+                parent = self.cur_node.parent
+                # repaint if parent is a list to refresh list numbering
+                if parent.data['type'] == 'list':
+                    parent.remove_children()
+                    self.update_tree(parent.data['key'], parent, self._traverse_yaml_data_(parent.data['abs_key']), self.default_highlight)
+
                 # highlight parent node to indicate change
-                self.cur_node.parent.set_label(self._text_highlighter_(self.delete_highlight, self.cur_node.parent.label))
+                parent.set_label(self._text_highlighter_(self.delete_highlight, parent.label))
 
                 # reset cursor to root to update the cur_node
                 self.json_tree.action_scroll_home()

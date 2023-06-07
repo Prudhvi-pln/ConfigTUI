@@ -33,7 +33,7 @@ python config-tui.py -i [yaml-file-to-be-edited]
 - [x] Preserve comments in the yaml
 
 ## Limitations
- - ~~Cannot preserve comments or any decorators on saving a yaml file.~~ Fixed as of v1.2
+ - ~~Cannot preserve comments or any decorators on saving a yaml file.~~ Fixed in v1.2
 
 ## Examples
  - Viewing yaml files: ![view yaml tree](./images/tree-tui.png)
