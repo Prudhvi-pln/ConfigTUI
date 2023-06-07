@@ -4,6 +4,7 @@
 - Going forward from `v1.2`, the depedency is changed to `ruamel.yaml` instead `PyYAML`
 - Increased IO speeds with the help of in-memory cache
 - Added ability to preserve comments in the yaml file
+- Fixed active node after a delete/insert operation
 
 ### [1.1] - 2023-06-06
 - Added highlighter to show changes [update/insert/delete]

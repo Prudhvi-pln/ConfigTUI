@@ -117,7 +117,7 @@ class ConfigurationEditor(App):
         self.insert_highlight = 'bold italic green'
         self.delete_highlight = 'bold italic red'
         # placeholders for edit fields
-        self.edit_node_help = "Select a node to edit..."
+        self.edit_node_help = "Select a node and press 'E' to edit..."
         self.add_node_help = "Provide input in json/dict format. [Ex: {'key1': 'val1', 'key2': [1, 2]}]"
         # define yaml loader
         self.yaml = YAML()              # by default, uses round-trip loader to load comments
@@ -126,7 +126,7 @@ class ConfigurationEditor(App):
 
     def compose(self) -> ComposeResult:
         self.edit_box = Input(placeholder=self.edit_node_help, id="edit-node")
-        self.edit_box.border_title = 'Enter new value'
+        self.edit_box.border_title = Text.from_markup('Enter your value [italic](press enter to save)[/]')
         self.json_tree = Tree('ROOT')
         yield Label("Configuration Editor", id='header')
         yield Footer()
@@ -139,8 +139,6 @@ class ConfigurationEditor(App):
         self.load_file()
         # load into tree
         self.update_tree('ROOT', self.json_tree.root, self.json_data, self.default_highlight)
-        # self.json_tree.show_root = False
-        # self.cur_node = self.json_tree.get_node_at_line(0)
         self.edit_box.disabled = True
         self.cur_node = self.json_tree.root.expand()
 
@@ -353,6 +351,7 @@ class ConfigurationEditor(App):
         if self.cur_node.data['type'] == 'list':
             data = [data]       # wrap data into list to render tree
         self.update_tree(self.cur_node.data['key'], self.cur_node, data, self.insert_highlight)
+        if status: self.edit_box.value = ''        # reset edit field value
 
         return status
 
@@ -380,8 +379,18 @@ class ConfigurationEditor(App):
 
     def action_edit(self) -> None:
         # do not edit if it is root or node is not editable
-        if self.cur_node.data.get('value') is None and not self.cur_node.data.get('editable'):
+        if not self.cur_node.data.get('editable'):
             return
+
+        # set edit field properties for updates
+        self.edit_box.placeholder = self.edit_node_help
+        self.edit_box.tooltip = None
+        if self.cur_node.data.get('editable'):
+            self.edit_box.value = str(self.cur_node.data.get('value'))
+            self.edit_box.disabled = False
+        else:
+            self.edit_box.value = ''
+            self.edit_box.disabled = True
 
         # change focus to input box for editing
         self.edit_box.focus()
@@ -391,16 +400,16 @@ class ConfigurationEditor(App):
         event.stop()
         # track the current node in the tree
         self.cur_node = event.node
-        # update node value in edit box
+        # reset edit field before any changes
         self.edit_box.border_subtitle = ''
         self.edit_box.placeholder = self.edit_node_help
-        self.edit_box.tooltip = None
+        self.edit_box.tooltip = self.edit_node_help
+        self.edit_box.disabled = True
+        # preview value in the edit box
         if self.cur_node.data.get('editable'):
             self.edit_box.value = str(self.cur_node.data.get('value'))
-            self.edit_box.disabled = False
         else:
             self.edit_box.value = ''
-            self.edit_box.disabled = True
 
     @on(Input.Submitted)
     def edit_field_handler(self, event: Input.Submitted) -> None:
@@ -412,17 +421,18 @@ class ConfigurationEditor(App):
             status = self.add_new_node()
 
         if status:
-            # remove any previous error message
+            # reset edit field
             self.edit_box.border_subtitle = ''
+            self.edit_box.disabled = True
             # once input submitted change focus to tree for viewing
             self.json_tree.focus()
 
     def action_insert_node(self) -> None:
         """Add new nodes under the selected node"""
-        # set edit field properties
-        self.edit_box.value = ''
+        # set edit field properties for insertion
         self.edit_box.placeholder = self.add_node_help
         self.edit_box.tooltip = self.add_node_help
+        self.edit_box.value = ''
         self.edit_box.disabled = False
         # change focus to input box for editing
         self.edit_box.focus()
@@ -444,7 +454,7 @@ class ConfigurationEditor(App):
                     pass
 
                 parent = self.cur_node.parent
-                # repaint if parent is a list to refresh list numbering
+                # repaint if parent is a list to refresh numbering inside the list
                 if parent.data['type'] == 'list':
                     parent.remove_children()
                     self.update_tree(parent.data['key'], parent, self._traverse_yaml_data_(parent.data['abs_key']), self.default_highlight)
@@ -452,8 +462,9 @@ class ConfigurationEditor(App):
                 # highlight parent node to indicate change
                 parent.set_label(self._text_highlighter_(self.delete_highlight, parent.label))
 
-                # reset cursor to root to update the cur_node
-                self.json_tree.action_scroll_home()
+                # reset cursor to parent & generate a node event for updates
+                self.json_tree.select_node(parent)
+                self.toggle_edit_field(self.json_tree.NodeHighlighted(parent))
 
         confirm_screen = AlertScreen(message=f"Delete node \[{' > '.join(str(k) for k in self.cur_node.data['abs_key'])}] ?")
         self.push_screen(confirm_screen, get_return_status)
