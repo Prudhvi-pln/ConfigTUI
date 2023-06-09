@@ -4,7 +4,7 @@ Enhancing the experience of editing YAML files, especially when dealing with lar
 ```
 config-tui: where YAML editing gets a friendly and quirky makeover! We make YAML editing an absolute delight :)
 ```
- - version: `1.2` - [2023-06-07]
+ - version: `1.2.5` - [2023-06-09]
 
 ## Pre-requisites
 ```
@@ -31,6 +31,10 @@ python config-tui.py -i [yaml-file-to-be-edited]
 - [ ] Ability to search within tree
 - [x] Add / remove new items in the yaml
 - [x] Preserve comments in the yaml
+- [ ] Add Word wrap to edit long values
+- [ ] Maintain positions when keys are edited
+- [x] Add support for various configuration types.
+  - Currently supports yaml, json and works for toml, ini or any configuration which can be loaded as json
 
 ## Limitations
  - ~~Cannot preserve comments or any decorators on saving a yaml file.~~ Fixed in v1.2

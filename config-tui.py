@@ -1,9 +1,10 @@
 # Description: To view/edit yaml files in TUI
 # Requires config-tui.css in the same folder level
 __author__ = 'PrudhviCh'
-__version__ = '1.2'
+__version__ = '1.2.5'
 
 import argparse
+import json
 import os
 from ruamel.yaml import YAML
 
@@ -56,12 +57,13 @@ class SaveScreen(ModalScreen):
 
     def __init__(self, **kwargs) -> None:
         super().__init__()
-        self.input_yml = kwargs['input_yml']
+        self.input_file = kwargs['input_file']
+        self.config_type = kwargs['config_type']
         self.yml_obj = kwargs['yml_obj']
         self.new_json_data = kwargs['data']
 
     def compose(self) -> ComposeResult:
-        self.out_file_name = Input(placeholder="Enter file name...", id="save-input", value=self.input_yml)
+        self.out_file_name = Input(placeholder="Enter file name...", id="save-input", value=self.input_file)
         self.out_file_name.border_title = 'Save as'
         yield Grid(
             self.out_file_name,
@@ -74,8 +76,12 @@ class SaveScreen(ModalScreen):
         # save configuration & exit
         out_file = self.out_file_name.value
         with open(out_file, 'w') as out:
-            self.yml_obj.dump(self.new_json_data, out)
-        self.app.exit(result=0, message=f'YAML file exported successfully as [{out_file}]')
+            if self.config_type == 'yaml':
+                self.yml_obj.dump(self.new_json_data, out)
+            elif self.config_type == 'json':
+                json.dump(self.new_json_data, out, indent=2)
+
+        self.app.exit(result=0, message=f'Configuration file exported successfully as [{out_file}]')
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == 'no':
@@ -123,6 +129,8 @@ class ConfigurationEditor(App):
         self.yaml = YAML()              # by default, uses round-trip loader to load comments
         self.yaml.indent(mapping=2)     # default indentation is 2 spaces
         self.yaml.preserve_quotes = True
+        # define type of configuration
+        self.config_type = None
 
     def compose(self) -> ComposeResult:
         self.edit_box = Input(placeholder=self.edit_node_help, id="edit-node")
@@ -138,12 +146,12 @@ class ConfigurationEditor(App):
         # load file
         self.load_file()
         # load into tree
-        self.update_tree('ROOT', self.json_tree.root, self.json_data, self.default_highlight)
+        self.update_tree(self.config_type.upper(), self.json_tree.root, self.json_data, self.default_highlight)
         self.edit_box.disabled = True
         self.cur_node = self.json_tree.root.expand()
 
     def _text_highlighter_(self, highlighter, key=None, value=None) -> Text:
-        """helper function to highlight label text."""
+        """Helper function to highlight label text."""
         if key is not None and value is None:
             # paint label of nested data
             highlighted = Text.from_markup(f"[{highlighter}]{key}[/]")
@@ -159,7 +167,7 @@ class ConfigurationEditor(App):
         return highlighted
 
     def _traverse_yaml_data_(self, keys: list) -> object:
-        """helper function to traverse the yaml data for a given list of keys
+        """Helper function to traverse the yaml data for a given list of keys
 
         Returns the corresponding object
         """
@@ -170,18 +178,29 @@ class ConfigurationEditor(App):
         return current_dict
 
     def _update_yaml_(self, new_value, action) -> bool:
-        """helper function to update the in-memory yaml
+        """Helper function to update the in-memory yaml
 
         Returns: True if update is successful, else False
         """
+        # no need to update the in-memory yaml if config type is not yaml
+        if self.config_type != 'yaml':
+            return True
+
         current_dict = self._traverse_yaml_data_(self.cur_node.data['abs_key'][:-1])
 
         last_key = self.cur_node.data['abs_key'][-1]
 
         if action == 'edit':
             if self.cur_node.data['type'] == 'dict':        # handle nested key changes
-                existing_value = current_dict.pop(last_key)
-                current_dict[new_value] = existing_value
+                # Below steps are unneccessary overhead. When you pop and insert the item is inserted at the end.
+                # For maintaining same position of keys, we need to re-insert all keys in the same-level :(
+                keys = list(current_dict.keys())            # store keys separately or else you'll see Runtime OrderedDict mutation error
+                for key in keys:
+                    existing_value = current_dict.pop(key)
+                    if key == last_key:
+                        current_dict[new_value] = existing_value
+                    else:
+                        current_dict[key] = existing_value
             else:                                           # handle normal leaf-level key changes
                 current_dict[last_key] = new_value
         elif action == 'insert':                            # handle addition of new elements
@@ -195,6 +214,37 @@ class ConfigurationEditor(App):
             current_dict.pop(last_key)
 
         return True
+
+    def _export_tree_to_json_(self, node):
+        """
+        Helper function to export a tree to JSON data.
+
+        Args:
+            node (TreeNode): Root node of the tree.
+
+        Returns:
+            JSON data representing the tree.
+        """
+        if not node.allow_expand:
+            # Leaf node, return the data directly
+            return node.data.get('value')
+        else:
+            # Non-leaf node, build a dictionary or list depending on the node type
+            if node.data['type'] == 'dict':
+                data = {}
+            else:
+                data = []
+
+            for child in node.children:
+                # Recursively export each child and add it to the dictionary or list
+                child_data = self._export_tree_to_json_(child)
+                if node.data['type'] == 'dict':
+                    key = child.data['key']
+                    data[key] = child_data
+                else:
+                    data.append(child_data)
+
+            return data
 
     def _invalid_input_handler_(self, err_msg) -> None:
         """Handle error inputs in edit field."""
@@ -261,11 +311,24 @@ class ConfigurationEditor(App):
 
     def load_file(self) -> None:
         """Load the YAML file as JSON."""
-        with open(self.config_file, 'r') as yml:
+        with open(self.config_file, 'r') as conf:
+            # check if file is yaml
             try:
-                self.json_data = self.yaml.load(yml)
-            except Exception as e:
-                self.app.exit(result=1, message=f'Error loading yaml file: {e}')
+                self.json_data = self.yaml.load(conf)
+                self.config_type = 'yaml'
+            except:
+                pass
+
+            conf.seek(0)
+            # check if file is json
+            try:
+                self.json_data = json.load(conf)
+                self.config_type = 'json'
+            except:
+                pass
+
+        if self.config_type is None:
+            self.app.exit(result=1, message=f'Invalid configuration file. File must be a valid json/yaml file.')
 
     def edit_value(self) -> bool:
         """Update the value in a node.
@@ -378,9 +441,11 @@ class ConfigurationEditor(App):
         self.update_tree('ROOT', tree.root, self.json_data, self.default_highlight)
 
     def action_edit(self) -> None:
-        # do not edit if it is root or node is not editable
-        if not self.cur_node.data.get('editable'):
-            return
+        if not self.cur_node.data.get('editable') or self.cur_node.is_root:
+            return      # do not allow edits if it is root or node is not editable
+
+        if self.cur_node.parent.data['type'] == 'list' and self.cur_node.data['type'] == 'dict':
+            return      # do not allow key edits if node is a dictionary in a list
 
         # set edit field properties for updates
         self.edit_box.placeholder = self.edit_node_help
@@ -454,8 +519,8 @@ class ConfigurationEditor(App):
                     pass
 
                 parent = self.cur_node.parent
-                # repaint if parent is a list to refresh numbering inside the list
-                if parent.data['type'] == 'list':
+                # repaint if parent is a list to refresh numbering inside the list only for in-memory yaml
+                if parent.data['type'] == 'list' and self.config_type == 'yaml':
                     parent.remove_children()
                     self.update_tree(parent.data['key'], parent, self._traverse_yaml_data_(parent.data['abs_key']), self.default_highlight)
 
@@ -472,11 +537,13 @@ class ConfigurationEditor(App):
     def action_save(self) -> None:
         """Save the configuration changes."""
 
-        # As of v1.2, all changes are done in-memory rather than doing lazy loading
-        # json_data = export_tree_to_json(self.json_tree.root)
+        if self.config_type == 'yaml':              # load in-memory yaml data
+            new_data = self.json_data
+        elif self.config_type == 'json':            # lazy load the updated data from tree if config type is json
+            new_data = self._export_tree_to_json_(self.json_tree.root)
 
         # send user to Save As popup
-        self.push_screen(SaveScreen(input_yml=self.config_file, data=self.json_data, yml_obj=self.yaml))
+        self.push_screen(SaveScreen(input_file=self.config_file, config_type=self.config_type, data=new_data, yml_obj=self.yaml))
 
 
 if __name__ == "__main__":
