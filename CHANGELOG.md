@@ -6,7 +6,7 @@
 - Added ability to preserve comments in the yaml file
 - Fixed active node after a delete/insert operation
 - Added native support for json files, and supports any configuration which can be loaded as json
-- Fixed maintaining same positions when keys are edited
+- Foxed problem of nested dicts no longer maintaining their original positions when keys are edited.
 
 ### [1.1] - 2023-06-06
 - Added highlighter to show changes [update/insert/delete]
