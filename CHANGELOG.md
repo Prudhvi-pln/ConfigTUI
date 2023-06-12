@@ -1,12 +1,13 @@
 # ConfigTUI Changelog
 
-### [1.2.5] - 2023-06-09
+### [1.2.5] - 2023-06-13
 - Going forward from `v1.2`, the depedency is changed to `ruamel.yaml` instead `PyYAML`
 - Increased IO speeds with the help of in-memory cache
 - Added ability to preserve comments in the yaml file
 - Fixed active node after a delete/insert operation
 - Added native support for json files, and supports any configuration which can be loaded as json
-- Fixed problem of nested dicts no longer maintaining their original positions when keys are edited.
+- Fixed problem of nested dicts no longer maintaining their original positions when keys are edited
+- Fixed issue with relative path of dependency css
 
 ### [1.1] - 2023-06-06
 - Added highlighter to show changes [update/insert/delete]

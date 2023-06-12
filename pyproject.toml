@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "config-tui"
+version = "1.2.5"
+description = "config-tui: where YAML editing gets a friendly and quirky makeover! We make YAML editing an absolute delight"
+authors = ["Prudhvi <prudhvichelluri@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+textual = "^0.27.0"
+argparse = "^1.4.0"
+ruamel-yaml = "^0.17.31"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
